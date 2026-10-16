@@ -11,6 +11,7 @@
     "test:smoke": "npm run bddgen && playwright test --headed --project=chromium",
     "test:webkit": "npm run bddgen && playwright test --headed --project=webkit",
     "test:all": "npm run bddgen && playwright test",
+    "test:leads": "npm run bddgen && playwright test --headed --project=chromium --grep @lead",
     "typecheck": "tsc --noEmit",
     "report": "playwright show-report"
   },
