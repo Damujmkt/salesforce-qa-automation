@@ -1,0 +1,6 @@
+{
+  "editor.formatOnSave": true,
+  "files.exclude": {"**/.features-gen": true, "**/node_modules": true},
+  "cucumberautocomplete.steps": ["steps/*.ts"],
+  "cucumberautocomplete.syncfeatures": "features/*.feature"
+}

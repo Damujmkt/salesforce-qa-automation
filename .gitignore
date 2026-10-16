@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.*
+!.env.example
+secrets/*
+!secrets/.gitkeep
+playwright/.auth/*
+!playwright/.auth/.gitkeep
+*.har
+*.zip
+.features-gen/
+test-results/
+playwright-report/
+blob-report/
+.DS_Store
+.vscode/*.log

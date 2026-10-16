@@ -1,0 +1,29 @@
+{
+  "name": "salesforce-qa-automation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Salesforce QA assessment: Playwright + TypeScript + BDD + Gmail OAuth authentication",
+  "scripts": {
+    "auth:gmail": "tsx auth/gmail-authorize.ts",
+    "auth:chromium": "playwright test --headed --project=setup-chromium",
+    "auth:webkit": "playwright test --project=setup-webkit",
+    "bddgen": "bddgen",
+    "test:smoke": "npm run bddgen && playwright test --headed --project=chromium",
+    "test:webkit": "npm run bddgen && playwright test --headed --project=webkit",
+    "test:all": "npm run bddgen && playwright test",
+    "typecheck": "tsc --noEmit",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^22.10.0",
+    "playwright-bdd": "^9.2.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@google-cloud/local-auth": "^3.0.1",
+    "dotenv": "^16.4.5",
+    "googleapis": "^144.0.0"
+  }
+}
