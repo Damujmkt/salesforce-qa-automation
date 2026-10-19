@@ -8,12 +8,12 @@
     "auth:chromium": "playwright test --headed --project=setup-chromium",
     "auth:webkit": "playwright test --project=setup-webkit",
     "bddgen": "bddgen",
-    "test:smoke": "npm run bddgen && playwright test --headed --project=chromium",
-    "test:webkit": "npm run bddgen && playwright test --headed --project=webkit",
+    "test:chrome": "npm run bddgen && playwright test --project=chromium",
+    "test:webkit": "npm run bddgen && playwright test --project=webkit",
     "test:all": "npm run bddgen && playwright test",
-    "test:leads": "npm run bddgen && playwright test --headed --project=chromium --grep @lead",
     "typecheck": "tsc --noEmit",
-    "report": "playwright show-report"
+    "report": "playwright show-report",
+    "test:smoke": "npm run bddgen && playwright test --project=chromium --project=webkit --grep @smoke"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

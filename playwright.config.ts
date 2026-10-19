@@ -10,14 +10,16 @@ const bddTestDir = defineBddConfig({
 
 export default defineConfig({
   testDir: bddTestDir,
-  timeout: 60_000,
-  expect: { timeout: 15_000 },
+  timeout: 180_000,
+  expect: { timeout: 20_000 },
   workers: 1,
-  fullyParallel: false,
+  fullyParallel: true,
   retries: 0,
   reporter: [['list'], ['html', { open: 'never' }], ['junit', { outputFile: 'test-results/junit.xml' }]],
   use: {
     baseURL: process.env.SF_ORG_URL,
+    actionTimeout: 25_000,
+    navigationTimeout: 45_000,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure'

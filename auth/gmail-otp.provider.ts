@@ -1,28 +1,32 @@
 import { google } from 'googleapis';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { envOr, requiredEnv } from './config';
-
-const TIMEOUT_MS = 90_000;
-const POLL_MS = 3_000;
-
+import { requiredEnv } from './config';
+const TIMEOUT_MS = 90000;
+const POLL_MS = 3000;
 function decode(value: string): string {
   return Buffer.from(value, 'base64url').toString('utf8');
 }
-
 type GmailPart = {
   mimeType?: string | null;
-  body?: { data?: string | null } | null;
+  body?: {
+    data?: string | null;
+  } | null;
   parts?: GmailPart[] | null;
 };
-
-function collectBodies(part?: GmailPart | null): { plain: string[]; html: string[] } {
+function collectBodies(part?: GmailPart | null): {
+  plain: string[];
+  html: string[];
+} {
   const result = { plain: [] as string[], html: [] as string[] };
-  if (!part) return result;
+  if (!part)
+    return result;
   if (part.body?.data) {
     const content = decode(part.body.data);
-    if (part.mimeType === 'text/plain') result.plain.push(content);
-    else if (part.mimeType === 'text/html') result.html.push(content);
+    if (part.mimeType === 'text/plain')
+      result.plain.push(content);
+    else if (part.mimeType === 'text/html')
+      result.html.push(content);
   }
   for (const child of part.parts ?? []) {
     const nested = collectBodies(child);
@@ -31,20 +35,17 @@ function collectBodies(part?: GmailPart | null): { plain: string[]; html: string
   }
   return result;
 }
-
 export function extractOtpCode(content: string, customPattern?: string): string | null {
   const normalized = content
     .replace(/<[^>]*>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&#\d+;/g, ' ')
     .replace(/\s+/g, ' ');
-
   const regex = customPattern
     ? new RegExp(customPattern, 'i')
     : /(?:verification|security|confirmation)\s+code\s*(?:is|:|-)?\s*(\d{6,8})\b/i;
   return regex.exec(normalized)?.[1] ?? null;
 }
-
 async function gmailClient() {
   const client = JSON.parse(await fs.readFile(path.resolve('secrets/google-oauth-client.json'), 'utf8'));
   const desktop = client.installed;
@@ -52,21 +53,21 @@ async function gmailClient() {
     throw new Error('Expected Google OAuth Desktop client JSON in secrets/google-oauth-client.json');
   }
   const token = JSON.parse(await fs.readFile(path.resolve('secrets/gmail-token.json'), 'utf8'));
-  if (!token.refresh_token) throw new Error('Gmail refresh token missing. Run npm run auth:gmail.');
-
+  if (!token.refresh_token)
+    throw new Error('Gmail refresh token missing. Run npm run auth:gmail.');
   const oauth = new google.auth.OAuth2(desktop.client_id, desktop.client_secret);
   oauth.setCredentials({ refresh_token: token.refresh_token });
   return google.gmail({ version: 'v1', auth: oauth });
 }
-
-function header(headers: Array<{ name?: string | null; value?: string | null }> | undefined, name: string): string {
+function header(headers: Array<{
+  name?: string | null;
+  value?: string | null;
+}> | undefined, name: string): string {
   return headers?.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value ?? '';
 }
-
 function senderAddress(from: string): string {
   return (from.match(/<([^>]+)>/)?.[1] ?? from).trim().toLowerCase();
 }
-
 export async function getVerificationCode(requestedAfter: number): Promise<string> {
   const sender = requiredEnv('GMAIL_SENDER').toLowerCase();
   const subjectKeyword = requiredEnv('GMAIL_SUBJECT_KEYWORD').toLowerCase();
@@ -75,12 +76,12 @@ export async function getVerificationCode(requestedAfter: number): Promise<strin
   const afterSeconds = Math.floor(requestedAfter / 1000) - 1;
   const query = `from:${sender} after:${afterSeconds}`;
   const inspected = new Set<string>();
-
   while (Date.now() < deadline) {
     try {
       const list = await gmail.users.messages.list({ userId: 'me', q: query, maxResults: 30 });
       for (const candidate of list.data.messages ?? []) {
-        if (!candidate.id || inspected.has(candidate.id)) continue;
+        if (!candidate.id || inspected.has(candidate.id))
+          continue;
         const msg = (await gmail.users.messages.get({
           userId: 'me', id: candidate.id, format: 'full'
         })).data;
@@ -107,8 +108,8 @@ export async function getVerificationCode(requestedAfter: number): Promise<strin
         }
         inspected.add(candidate.id);
       }
-    } catch (error: unknown) {
-
+    }
+    catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       if (/invalid_grant|invalid_client|unauthorized|insufficient permissions|403/i.test(msg)) {
         throw new Error('Gmail OAuth authorization expired or was revoked. Run npm run auth:gmail again.');

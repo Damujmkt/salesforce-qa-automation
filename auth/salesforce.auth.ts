@@ -3,61 +3,52 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { envOr, requiredEnv } from './config';
 import { getVerificationCode } from './gmail-otp.provider';
-
 export type SupportedBrowser = 'chromium' | 'webkit';
-
-export const authStatePath = (browser: SupportedBrowser) =>
-  path.resolve(`playwright/.auth/${browser}.json`);
-
+export const authStatePath = (browser: SupportedBrowser) => path.resolve(`playwright/.auth/${browser}.json`);
 const loginUrl = () => envOr('SF_LOGIN_URL', 'https://login.salesforce.com/');
 const orgUrl = () => requiredEnv('SF_ORG_URL');
-const readySelector = () => envOr('SF_AUTH_READY_SELECTOR',
-  'button[title="App Launcher"], button[aria-label="App Launcher"], .slds-global-header');
+const readySelector = () => envOr('SF_AUTH_READY_SELECTOR', 'button[title="App Launcher"], button[aria-label="App Launcher"], .slds-global-header');
 const otpInputSelector = '#emc';
 const otpSubmitSelector = 'button:has-text("Verify"), input[type="submit"][value*="Verify"]';
-
 function looksLikeLogin(url: string): boolean {
   return /\/login|\/secur\/frontdoor|identity\/verification|challenge|login\.salesforce\.com/i.test(url);
 }
-
 async function validateSession(page: Page): Promise<boolean> {
   try {
-    await page.goto(orgUrl(), { waitUntil: 'domcontentloaded', timeout: 30_000 });
-    if (looksLikeLogin(page.url())) return false;
-    await page.locator(readySelector()).first().waitFor({ state: 'visible', timeout: 15_000 });
+    await page.goto(orgUrl(), { waitUntil: 'domcontentloaded', timeout: 30000 });
+    if (looksLikeLogin(page.url()))
+      return false;
+    await page.locator(readySelector()).first().waitFor({ state: 'visible', timeout: 15000 });
     return !looksLikeLogin(page.url());
-  } catch {
+  }
+  catch {
     return false;
   }
 }
-
 async function completeLogin(page: Page): Promise<void> {
   await page.goto(loginUrl(), { waitUntil: 'domcontentloaded' });
   await page.locator('#username').fill(requiredEnv('SF_USERNAME'));
   await page.locator('#Login').click();
   await page.locator('#password').fill(requiredEnv('SF_PASSWORD'));
-
   const requestedAfter = Date.now();
   await page.locator('#Login').click();
-
-  const otpInput = page.locator(otpInputSelector)
+  const otpInput = page.locator(otpInputSelector);
   const outcome = await Promise.any([
-    otpInput.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'otp' as const),
-    page.locator(readySelector()).first().waitFor({ state: 'visible', timeout: 60_000 })
+    otpInput.waitFor({ state: 'visible', timeout: 60000 }).then(() => 'otp' as const),
+    page.locator(readySelector()).first().waitFor({ state: 'visible', timeout: 60000 })
       .then(() => 'ready' as const)
   ]).catch(() => {
     throw new Error(`Salesforce login did not show OTP or Lightning UI: ${page.url()}`);
   });
-
   if (outcome === 'otp') {
     const otp = await getVerificationCode(requestedAfter);
     await otpInput.fill(otp);
     await page.locator(otpSubmitSelector).first().click();
-    await page.locator(readySelector()).first().waitFor({ state: 'visible', timeout: 60_000 });
+    await page.locator(readySelector()).first().waitFor({ state: 'visible', timeout: 60000 });
   }
-  if (looksLikeLogin(page.url())) throw new Error('Salesforce login did not complete.');
+  if (looksLikeLogin(page.url()))
+    throw new Error('Salesforce login did not complete.');
 }
-
 export async function ensureAuthenticated(browserName: SupportedBrowser): Promise<void> {
   const stateFile = authStatePath(browserName);
   fs.mkdirSync(path.dirname(stateFile), { recursive: true });
@@ -73,11 +64,11 @@ export async function ensureAuthenticated(browserName: SupportedBrowser): Promis
           return;
         }
         console.log(`${browserName}: cached session invalid; reauthentication required.`);
-      } finally {
+      }
+      finally {
         await cached.close();
       }
     }
-
     const context: BrowserContext = await browser.newContext();
     try {
       const page = await context.newPage();
@@ -87,10 +78,12 @@ export async function ensureAuthenticated(browserName: SupportedBrowser): Promis
       }
       await context.storageState({ path: stateFile });
       console.log(`${browserName}: Salesforce session refreshed and cached.`);
-    } finally {
+    }
+    finally {
       await context.close();
     }
-  } finally {
+  }
+  finally {
     await browser?.close();
   }
 }

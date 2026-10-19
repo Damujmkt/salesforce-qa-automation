@@ -19,3 +19,14 @@ Feature: Salesforce Lead creation and editing
     When I update the Lead status to "Working - Contacted"
     Then the Lead status should be "Working - Contacted"
     And the updated status should persist after page reload
+
+  @lead-mandatory-fields @negative
+  Scenario: Required Lead fields cannot be left blank
+    When I try to save a Lead without Last Name and Company
+    Then Salesforce should show the required Lead field errors
+
+  @duplicate-email @negative
+  Scenario: Duplicate Lead email detection when configured
+    Given I have created a Lead with valid details
+    When I try to create another Lead with the same email
+    Then Salesforce should warn about the duplicate Lead if detection is enabled

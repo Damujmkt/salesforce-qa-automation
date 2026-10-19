@@ -2,13 +2,32 @@
 
 Playwright + TypeScript + Playwright-BDD + Page Object Model. This repository currently implements Salesforce authentication and Chromium/WebKit login smoke tests. 
 
-## Setup
+## Assessment Coverage
+
+The Playwright TypeScript framework covers the following Salesforce CRM scenarios:
+
+- Authentication: Salesforce login with Gmail OTP handling and cached browser sessions.
+- Lead Management: Create Leads with unique data, validate the 18-character Lead ID, and update Lead Status.
+- Lead Conversion (TC01–TC04): Convert Leads using new or existing Accounts and Contacts, and validate Opportunity details, relationships, Owner and Stage.
+- Negative Testing: Validate mandatory-field errors and attempt duplicate-email creation. Duplicate detection is conditionally skipped when not enforced by Salesforce.
+- API Validation : Intercept the Salesforce conversion API, validate the JSON response and capture sanitized evidence.
+- Execution: Chromium and WebKit testing with parallel execution, unique test data and automatic teardown.
+
+**Test results:** All mandatory scenarios have been implemented. Duplicate-email warning validation is conditional on the Salesforce environment.
+
+**Observation** This Salesforce org has permitted duplicate Lead emails although there is warning. It looks like issue, that is why duplicate-warning validation is **skipped**, not reported as a successful duplicate block. the cleanup registry logs those skips.
+
+## Prerequisites and installation
+
+1. Create and activate a **Salesforce Developer Edition** account at <https://orgfarm-04c10729fc-dev-ed.develop.my.salesforce.com>. Registration/activation is a one-time manual prerequisite.
+2. Install Node.js and npm. On Windows PowerShell, run:
 
 ```powershell
 npm ci
 npx playwright install chromium webkit
 Copy-Item .env.example .env
 ```
+Refer .env.example for project configurations
 
 ###  Configure Google Cloud OAuth (one-time)
 1. Open https://console.cloud.google.com and create/select a project.
@@ -42,6 +61,19 @@ npm run test:smoke
 npm run test:webkit
 npm run report
 ```
+For additional test execution options, refer to the scripts section in package.json
+
+## Reports and failure evidence
+
+```powershell
+npm run report
+```
+
+Playwright creates an HTML report (`playwright-report/`) and a JUnit file (`test-results/junit.xml`). Failure screenshots, video and traces are saved under `test-results/`. To inspect a trace:
+
+```powershell
+npx playwright show-trace "test-results/<failed-scenario>/trace.zip"
+```
 
 ## Session recovery checks
 
@@ -49,8 +81,6 @@ npm run report
 2. Delete `playwright/.auth/chromium.json` and rerun to test missing-cache recovery.
 3. Revoke the Salesforce session and rerun to test actual server-side invalidation recovery.
 4. Run `npm run test:webkit` to confirm the independent WebKit state.
-
-Missing-cache recovery does not prove recovery from a revoked session. Keep both results as separate evidence.
 
 ## Security and tradeoffs
 

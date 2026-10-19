@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-
 export type LeadData = {
   firstName: string;
   lastName: string;
@@ -7,7 +6,6 @@ export type LeadData = {
   email: string;
   leadSource: string;
 };
-
 export function uniqueLead(): LeadData {
   const suffix = randomUUID().slice(0, 8);
   return {

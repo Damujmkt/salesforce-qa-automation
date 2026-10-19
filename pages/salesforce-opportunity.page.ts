@@ -1,112 +1,106 @@
-
 import { expect, type Locator, type Page } from '@playwright/test';
-
+import { expectSameSalesforceId, recordIdFromUrl } from '../support/salesforce-records';
 export class SalesforceOpportunityPage {
     constructor(private readonly page: Page) { }
-    async openByName(opportunityName: string): Promise<void> {
-        const goToLeads = this.page.getByRole('button', {
-            name: 'Go to Leads',
-            exact: true
-        });
-        if (await goToLeads.isVisible()) {
-            await goToLeads.click();
+    async openById(opportunityId: string): Promise<void> {
+        if (!/^006[A-Za-z0-9]{12}(?:[A-Za-z0-9]{3})?$/.test(opportunityId)) {
+            throw new Error(`Invalid Opportunity ID: ${opportunityId}`);
         }
-        await this.page.getByRole('link', {
-            name: 'Opportunities',
-            exact: true
-        }).first().click();
-        const recordLink = this.page.getByRole('link', {
-            name: opportunityName,
-            exact: true
+        const url = new URL(`/lightning/r/Opportunity/${opportunityId}/view`, this.page.url());
+        await this.page.goto(url.toString(), {
+            waitUntil: 'domcontentloaded'
         });
-        if (await recordLink.count() === 0) {
-            const search = this.page.getByRole('searchbox', {
-                name: /Search this list/i
-            });
-
-            await expect(search).toBeVisible();
-            await search.fill(opportunityName);
-            await search.press('Enter');
-        }
-        await expect(recordLink.first()).toBeVisible();
-        await recordLink.first().click();
-        await expect(this.page).toHaveURL(
-            /\/lightning\/r\/Opportunity\/[a-zA-Z0-9]{15,18}/
-        );
+        await expect(this.page).toHaveURL(/\/lightning\/r\/Opportunity\/[A-Za-z0-9]{15,18}\/view/);
+        await expect(this.page.getByRole('tab', {
+            name: 'Details',
+            exact: true
+        })).toBeVisible({ timeout: 30000 });
+        console.log(`Opportunity page ready: ${opportunityId}`);
     }
-
     async verifyOpportunity(name: string): Promise<void> {
-        await expect(this.page).toHaveURL(
-            /\/lightning\/r\/Opportunity\/[a-zA-Z0-9]{15,18}/
-        );
-        await expect(
-            this.page.getByText(name, { exact: true })
-                .filter({ visible: true })
-                .first()
-        ).toBeVisible();
+        await expect(this.page).toHaveURL(/\/lightning\/r\/Opportunity\/[a-zA-Z0-9]{15,18}/);
+        await expect(this.page.getByText(name, { exact: true })
+            .filter({ visible: true })
+            .first()).toBeVisible();
     }
-
     private field(label: string): Locator {
         return this.page
-            .locator('.test-id__output-root')
+            .getByRole('tabpanel', { name: 'Details' })
+            .getByRole('listitem')
             .filter({
-                has: this.page.locator('.test-id__field-label', {
-                    hasText: new RegExp(`^${label}$`)
+                has: this.page.getByText(label, {
+                    exact: true
                 })
             });
     }
-
     async verifyAccount(accountName: string): Promise<void> {
         await this.openDetails();
         const accountField = this.field('Account Name');
         await expect(accountField).toContainText(accountName);
-        await expect(
-            accountField.getByRole('link', {
-                name: accountName,
-                exact: true
-            })
-        ).toBeVisible();
-    }
-
-    async verifyContact(contactName: string): Promise<void> {
-        await this.page.getByRole('tab', {
-            name: 'Related',
+        await expect(accountField.getByRole('link', {
+            name: accountName,
             exact: true
-        }).click();
-        await expect(
-            this.page.getByText(/Contact Roles/i)
-                .filter({ visible: true })
-                .first()
-        ).toBeVisible();
-        await expect(
-            this.page.getByRole('link', {
-                name: contactName,
-                exact: true
-            }).first()
-        ).toBeVisible();
+        })).toBeVisible();
     }
-
     async verifyOwner(): Promise<void> {
         await this.openDetails();
-        const ownerField = this.field('Opportunity Owner');
-        await expect(ownerField).toBeVisible();
-        const owner = await ownerField
-            .locator('.test-id__field-value')
-            .innerText();
-        expect(owner.trim()).not.toBe('');
+        const ownerLink = this.field('Opportunity Owner').getByRole('link').first();
+        await expect(ownerLink).toBeVisible();
+        await expect(ownerLink).toHaveAttribute('href', /\/lightning\/r\/User\/005[A-Za-z0-9]{12}(?:[A-Za-z0-9]{3})?\/view/);
     }
-
     async verifyStage(stage: string): Promise<void> {
         await this.openDetails();
         const stageField = this.field('Stage');
         await expect(stageField).toContainText(stage);
     }
-
+    async verifyAccountId(expectedId: string): Promise<void> {
+        await this.openDetails();
+        const accountLink = this.field('Account Name')
+            .getByRole('link')
+            .first();
+        await expect(accountLink).toBeVisible();
+        const href = await accountLink.getAttribute('href');
+        if (!href) {
+            throw new Error('Opportunity Account link missing');
+        }
+        const actualId = recordIdFromUrl(new URL(href, this.page.url()).toString(), 'Account');
+        expectSameSalesforceId(actualId, expectedId);
+    }
+    async verifyConvertedContactAccount(contactId: string, expectedAccountId: string, expectedContactName: string): Promise<void> {
+        const opportunityUrl = this.page.url();
+        const origin = new URL(opportunityUrl).origin;
+        const contactUrl = new URL(`/lightning/r/Contact/${contactId}/view`, origin).toString();
+        try {
+            await this.page.goto(contactUrl, { waitUntil: 'domcontentloaded' });
+            await expect(this.page).toHaveURL(/\/lightning\/r\/Contact\/[A-Za-z0-9]{15,18}/);
+            await expect(this.page.getByText(expectedContactName, { exact: true })
+                .filter({ visible: true }).first()).toBeVisible();
+            await this.openDetails();
+            const parentAccount = this.field('Account Name').getByRole('link').first();
+            const accountId = expectedAccountId.slice(0, 15);
+            await expect(parentAccount).toHaveAttribute(
+                'href',
+                new RegExp(
+                    `/lightning/r/Account/${accountId}(?:[A-Za-z0-9]{3})?/view`
+                ),
+                { timeout: 20_000 }
+            );
+        }
+        finally {
+            await this.page.goto(opportunityUrl, { waitUntil: 'domcontentloaded' });
+        }
+    }
     private async openDetails(): Promise<void> {
         const detailsTab = this.page.getByRole('tab', {
             name: 'Details',
             exact: true
         });
-        await detailsTab.click();
+        await expect(detailsTab).toBeVisible();
+        if ((await detailsTab.getAttribute('aria-selected')) !== 'true') {
+            await detailsTab.click();
+        }
+        await expect(this.page.getByRole('tabpanel', {
+            name: 'Details'
+        })).toBeVisible();
     }
 }
